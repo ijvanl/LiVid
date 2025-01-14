@@ -1,15 +1,82 @@
 import cv2, numpy as np
 from PIL import Image, ImageFilter, ImageOps, ImageChops
+from dotmap import DotMap
 
+PP_RGB = "rgb"
+PP_DEPTH = "depth"
 
-def bound_depth(value, lower, upper, contrast):
-	return np.clip((1.0 - abs((value - lower) / (upper - lower))) * contrast, 0.0, 1.0)
+_PP_LAST_IMAGE = None
+_PP_LAST_IMAGE_SET = False
 
-def resize_img(arr, size):
-	return np.float32(np.array(Image.fromarray(np.uint8(arr)).resize((size[1], size[0])))) / 255.0
+class PPFunction:
+	def __init__(self, use_streams=[PP_DEPTH]):
+		self._pp_use_streams = use_streams
+		self._pp_rgb_frame = None
+		self._pp_rgb_frame_zoomed = None
+		self._pp_depth_frame = None
+		self._pp_intrinsic_matrix = None
+		self._pp_zoom = None
+	
+	def values(self):
+		return {}
+	
+	def postprocess(self, values):
+		return self.depth(1.0)
 
-def gs_to_rgb(arr):
-	return np.stack((arr, ) * 3, axis=-1)
+	def postprocess_raw(self, rgb, depth, intrinsic_matrix, pp, zoom_x, zoom_y, zoom_amount):
+		global _PP_LAST_IMAGE, _PP_LAST_IMAGE_SET
+
+		self._pp_zoom = (zoom_x, zoom_y, zoom_amount)
+		self._pp_intrinsic_matrix = intrinsic_matrix
+
+		if PP_RGB in self._pp_use_streams:
+			screen = np.swapaxes(rgb, 0, 1)
+			self._pp_rgb_frame = Image.fromarray(screen).convert("RGB").resize((640, 480), resample=2)
+			self._pp_rgb_frame = self._pp_rgb_frame.transpose(Image.FLIP_LEFT_RIGHT)
+			self._pp_rgb_frame_zoomed = zoom_at(self._pp_rgb_frame, zoom_x, zoom_y, zoom_amount)
+		
+		if PP_DEPTH in self._pp_use_streams:
+			self._pp_depth_frame = np.swapaxes(depth, 0, 1)
+		
+		image = self.postprocess(DotMap(pp))
+
+		if _PP_LAST_IMAGE_SET == False:
+			_PP_LAST_IMAGE = image
+		_PP_LAST_IMAGE_SET = False
+		return np.array(image)
+
+	def rgb(self, zoom=True):
+		return (self._pp_rgb_frame_zoomed if zoom else self._pp_rgb_frame)
+
+	def depth(self, contrast: float, zoom=True):
+		if not PP_DEPTH in self._pp_use_streams: return None
+		screen = np.clip(self._pp_depth_frame * contrast, 0.0, 1.0)
+		screen_img = Image.fromarray(screen * 255).convert("RGB").resize((640, 480), resample=2)
+		screen_img = screen_img.transpose(Image.FLIP_LEFT_RIGHT)
+		return (zoom_at(screen_img, *self._pp_zoom) if zoom else screen_img)
+	
+	def depth_bound(self, lower: float, upper: float, contrast: float, zoom=True):
+		screen = self._pp_depth_frame
+
+		screen = np.clip((1.0 - abs((screen - lower) / (upper - lower))) * contrast, 0.0, 1.0)
+
+		screen_img = Image.fromarray(screen * 255).convert("RGB").resize((640, 480), resample=2)
+
+		screen_img = screen_img.transpose(Image.FLIP_LEFT_RIGHT)
+		return (zoom_at(screen_img, *self._pp_zoom) if zoom else screen_img)
+	
+	def last_image(self, set=None):
+		global _PP_LAST_IMAGE, _PP_LAST_IMAGE_SET
+		if set is None:
+			if _PP_LAST_IMAGE is not None:
+				return _PP_LAST_IMAGE
+			else:
+				return Image.fromarray(np.zeros((640, 480))).convert("RGB")
+		else:
+			last = _PP_LAST_IMAGE
+			_PP_LAST_IMAGE = set
+			_PP_LAST_IMAGE_SET = True
+			return last
 
 def zoom_at(img, x, y, zoom):
 	w, h = img.size
@@ -19,110 +86,3 @@ def zoom_at(img, x, y, zoom):
 		x + w / zoom2, y + h / zoom2)
 	)
 	return img.resize((w, h))
-
-last_image = None
-
-
-BLACK_IMG = Image.fromarray(np.zeros((640, 480))).convert("RGB").resize(
-		(640, 480), resample=2
-	)
-
-class PostProcessFunctionsBuiltIn:
-	def pp_video(rgb, depth, confidence, intrinsic_matrix, pp, zoom_x, zoom_y, zoom_amount):
-		screen = np.swapaxes(rgb, 0, 1)
-
-		screen_img = Image.fromarray(screen).convert("RGB").resize((640, 480), resample=2)
-		screen_img = screen_img.transpose(Image.FLIP_LEFT_RIGHT)
-		screen_img = zoom_at(screen_img, zoom_x, zoom_y, zoom_amount)
-
-		screen = np.array(screen_img)
-
-		return screen
-
-	def pp_depth(rgb, depth, confidence, intrinsic_matrix, pp, zoom_x, zoom_y, zoom_amount):
-		screen = np.swapaxes(depth, 0, 1)
-		screen = np.clip(screen, 0.0, 1.0)
-
-		screen_img = Image.fromarray(screen * 255).convert("RGB").resize((640, 480), resample=2)
-		screen_img = screen_img.transpose(Image.FLIP_LEFT_RIGHT)
-		screen_img = zoom_at(screen_img, zoom_x, zoom_y, zoom_amount)
-
-		screen = np.array(screen_img)
-
-		return screen
-
-	def pp_outline(rgb, depth, confidence, intrinsic_matrix, pp, zoom_x, zoom_y, zoom_amount):
-		global last_image
-
-		screen = np.swapaxes(depth, 0, 1)
-
-		screen = bound_depth(screen, pp.depth_lower_bound, pp.depth_upper_bound, pp.depth_contrast)
-		screen = np.clip(screen, 0.0, 1.0)
-
-		screen_img = Image.fromarray(screen * 255).convert("RGB").filter(
-			ImageFilter.FIND_EDGES
-		).resize((640, 480), resample=2)
-
-		screen_img = screen_img.transpose(Image.FLIP_LEFT_RIGHT)
-		screen_img = zoom_at(screen_img, zoom_x, zoom_y, zoom_amount)
-
-		if last_image is None:
-			last_image = screen_img
-
-		last_image = Image.blend(last_image, BLACK_IMG, pp.fade_coeff)
-		screen_img = ImageChops.add(screen_img, last_image.filter(ImageFilter.GaussianBlur(pp.blur_radius)))
-
-		last_image = screen_img
-
-		screen = np.array(screen_img)
-
-		return screen
-
-	def pp_lamp_smoke(rgb, depth, confidence, intrinsic_matrix, pp, zoom_x, zoom_y, zoom_amount):
-		global last_image
-
-		screen = np.swapaxes(depth, 0, 1)
-
-		screen = bound_depth(screen, pp.depth_lower_bound, pp.depth_upper_bound, pp.depth_contrast)
-		screen = np.clip(screen, 0.0, 1.0)
-
-		screen_img = Image.fromarray(screen * 255).convert("RGB").resize(
-			(640, 480), resample=2
-		)
-
-		screen_img = screen_img.transpose(Image.FLIP_LEFT_RIGHT)
-		screen_img = zoom_at(screen_img, zoom_x, zoom_y, zoom_amount)
-
-		if last_image is None:
-			last_image = screen_img
-
-		last_image = Image.blend(last_image, BLACK_IMG, pp.fade_coeff)
-		screen_img = ImageChops.add(screen_img, last_image.filter(ImageFilter.GaussianBlur(pp.blur_radius)))
-
-		last_image = screen_img
-
-		screen = np.array(screen_img)
-
-		return screen
-
-	def pp_lamp_nosmoke(rgb, depth, confidence, intrinsic_matrix, pp, zoom_x, zoom_y, zoom_amount):
-		global last_image
-
-		screen = np.swapaxes(depth, 0, 1)
-
-		screen = bound_depth(screen, pp.depth_lower_bound, pp.depth_upper_bound, pp.depth_contrast)
-		screen = np.clip(screen, 0.0, 1.0)
-
-		screen_img = Image.fromarray(screen * 255).convert("RGB").resize(
-			(640, 480), resample=2
-		)
-
-		screen_img = screen_img.transpose(Image.FLIP_LEFT_RIGHT)
-		screen_img = zoom_at(screen_img, zoom_x, zoom_y, zoom_amount)
-
-		if last_image is None:
-			last_image = screen_img
-
-		screen = np.array(screen_img)
-
-		return screen
