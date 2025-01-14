@@ -81,41 +81,115 @@ class LiVidApp:
 
 	def callback(self):
 		self.gui.quit()
-	
-	def import_new_pp_suite(self):
+
+	### FILE FUNCTIONS
+
+	def save_patch_bank_to_file(self):
+		with filedialog.asksaveasfile(mode='w+', defaultextension=".vvpb", initialfile="New Patch Bank.vvpb") as f:
+			patches = [p.save() for p in self.pp_save_slots]
+			scripts = [(n, base64.b64encode(s).decode("utf-8")) for (n, s) in self.pp_suites_imported_text]
+
+			save = {
+				"version": LIVID_VERSION,
+				"imported_scripts": scripts,
+				"patches": patches,
+				"last_save": self.current_pp_save
+			}
+
+			f.write(json.dumps(save))
+
+	def save_single_patch_to_file(self):
+		with filedialog.asksaveasfile(mode='w+', defaultextension=".vvp", initialfile="New Patch.vvp") as f:
+			patch = self.pp_save_slots[self.current_pp_save].save()
+			scripts = [(n, base64.b64encode(s).decode("utf-8")) for (n, s) in self.pp_suites_imported_text]
+
+			save = {
+				"version": LIVID_VERSION,
+				"imported_scripts": scripts,
+				"patch": patch,
+			}
+
+			f.write(json.dumps(save))
+
+	def load_patch_bank_from_file(self):
+		with filedialog.askopenfile(mode="r", defaultextension=".vvpb") as f:
+			load = json.load(f)
+			for script in load["imported_scripts"]:
+				(name, text) = (script[0], base64.b64decode(script[1]))
+				self.import_new_pp_func_from_text(text, f.name)
+				# so __file__ == the .vvpb file (for asset reasons)
+
+			patches = [load_pp_info(p) for p in load["patches"]]
+			
+			self.pp_save_slots = patches
+			self.switch_patch(load["last_save"])
+
+	def load_single_patch_from_file(self):
+		with filedialog.askopenfile(mode="r", defaultextension=".vvp") as f:
+			load = json.load(f)
+			for script in load["imported_scripts"]:
+				(name, text) = (script[0], base64.b64decode(script[1]))
+				self.import_new_pp_func_from_text(text, f.name)
+				# so __file__ == the .vvp file (for asset reasons)
+			
+			self.pp_save_slots[self.current_pp_save] = load_pp_info(load["patch"])
+			self.build_sliders()
+			self.update_save_labels()
+
+	def create_new_script_from_template(self):
+		tf = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "template.py"), "r")
+		template = tf.read()
+		tf.close()
+
+		f = filedialog.asksaveasfile(mode="w", defaultextension=".py", initialfile="new_script.py")
+		fname = f.name
+		f.write(template)
+		f.close()
+
+		open_file(fname)
+
+	def import_new_pp_func(self):
 		with filedialog.askopenfile("rb", defaultextension=".py") as source_file:
 			source_text = source_file.read()
-			self.import_new_pp_suite_from_text(source_text, source_file.name)
+			self.import_new_pp_func_from_text(source_text, source_file.name)
 
-	def import_new_pp_suite_from_text(self, source_text, name):
+	def import_new_pp_func_from_text(self, source_text, name):
 		code = compile(source_text, name, "exec")
 		file_globals = { "__file__": name }
 		exec(code, file_globals)
 		self.pp_suites_imported.extend(file_globals["__PP_FUNCTIONS_SUITE__"])
 		self.pp_suites_imported_text.append((name, source_text))
 		self.update_pp_rolodex()
-	
-	def find_pp_func_in_suites(self, fname):
+
+	def find_pp_func_in_imported(self, fname):
 		pp = pp_builtins.__PP_FUNCTIONS_SUITE__ + self.pp_suites_imported
 		for s in pp:
 			if s.__class__.__name__ == fname:
 				return s
 		return None
-	
+
 	def get_all_pp_func_names(self):
 		pp = pp_builtins.__PP_FUNCTIONS_SUITE__ + self.pp_suites_imported
-		names = []
-		for s in pp:
-			if s.__class__.__name__.startswith("PP"):
-				names.append(s.__class__.__name__)
-		return names
-	
-	def update_pp_rolodex(self):
-		self.pp_type_rolodex["menu"].delete(0, "end")
-		for opt in self.get_all_pp_func_names():
-			self.pp_type_rolodex["menu"].add_command(
-				label=opt, command=tk._setit(self.pp_type_rolodex_value, opt, self.change_pp_type_from_rolodex)
-			)
+		return [s.__class__.__name__ for s in pp]
+
+	### PATCH FUNCTIONS
+
+	def switch_patch(self, to):
+		self.current_pp_save = to
+		self.pp_save_changed = False
+		self.pp_revert.load(self.pp_save_slots[self.current_pp_save].save())
+		self.build_sliders()
+		self.update_save_labels()
+
+	def fix_patch_changes(self):
+		self.switch_patch(self.current_pp_save)
+		self.update_save_labels()
+
+	def revert_patch_changes(self):
+		self.pp_save_changed = False
+		self.pp_save_slots[self.current_pp_save].load(self.pp_revert.save())
+		self.build_sliders()
+		self.update_save_labels()
 
 	def new_value_dict(self, old_dict, new_dict):
 		for k in new_dict:
@@ -123,34 +197,17 @@ class LiVidApp:
 				old_dict[k] = new_dict[k][2] # default value
 		print(old_dict)
 
-	def switch_save(self, to):
-		self.current_pp_save = to
-		self.pp_save_changed = False
-		self.pp_revert.load(self.pp_save_slots[self.current_pp_save].save())
-		self.build_sliders()
-		self.update_save_labels()
-
-	def save_changes(self):
-		self.switch_save(self.current_pp_save)
-		self.update_save_labels()
-
-	def revert_changes(self):
-		self.pp_save_changed = False
-		self.pp_save_slots[self.current_pp_save].load(self.pp_revert.save())
-		self.build_sliders()
-		self.update_save_labels()
-
 	def change_pp_type_from_rolodex(self, value):
 		print(value)
 		self.pp_save_slots[self.current_pp_save].pp_type = value
 		self.new_value_dict(
 			self.pp_save_slots[self.current_pp_save].value_dict,
-			self.find_pp_func_in_suites(value).values()
+			self.find_pp_func_in_imported(value).values()
 		)
 		self.pp_save_changed = True
 		self.build_sliders()
 		self.update_save_labels()
-	
+
 	def chg_var(self, var, x, label):
 		self.pp_save_slots[self.current_pp_save].__dict__[var] = float(x)
 		label["text"] = f"{float(x):8.2f}"
@@ -160,20 +217,9 @@ class LiVidApp:
 	def chg_var_self(self, var, x, label):
 		self.__dict__[var] = float(x)
 		label["text"] = f"{float(x):8.2f}"
-	
-	def postprocess_fn(self, rgb, depth, confidence, intrinsic_matrix):
-		pp_type = self.pp_save_slots[self.current_pp_save].pp_type
-		if pp_type != self.last_pp_type:
-			print("new pp_type into cache")
-			self.pp_func_cache = self.find_pp_func_in_suites(pp_type).postprocess_raw
 
-		self.last_pp_type = pp_type
+	### GUI FUNCTIONS
 
-		return self.pp_func_cache(
-			rgb, depth, intrinsic_matrix,
-			self.pp_save_slots[self.current_pp_save].value_dict, self.zoom_x, self.zoom_y, self.zoom_amount
-		)
-	
 	def build_sliders(self):
 		root = self.slider_frame
 		
@@ -187,7 +233,7 @@ class LiVidApp:
 
 		grid_row = 0 # start here, shall we
 
-		for (k, v) in self.find_pp_func_in_suites(self.pp_save_slots[self.current_pp_save].pp_type).values().items():
+		for (k, v) in self.find_pp_func_in_imported(self.pp_save_slots[self.current_pp_save].pp_type).values().items():
 			(name, minval, defval, maxval) = v
 			tkval = tk.DoubleVar(self.gui)
 			name_label = ttk.Label(root, text=name)
@@ -212,16 +258,23 @@ class LiVidApp:
 		self.update_sliders()
 		print("build_sliders complete")
 
-	def update_slider_values(self):
-		for (k, v) in self.current_sliders.items():
-			self.pp_save_slots[self.current_pp_save].value_dict[k] = v["tkval"].get()
-		self.update_sliders()
-
 	def update_sliders(self):
 		self.pp_type_rolodex_value.set(self.pp_save_slots[self.current_pp_save].pp_type)
 		for (k, v) in self.current_sliders.items():
 			v["tkval"].set(self.pp_save_slots[self.current_pp_save].value_dict[k])
 			v["value_label"]["text"] = f"{float(v["tkval"].get()):8.2f}"
+
+	def update_slider_values(self):
+		for (k, v) in self.current_sliders.items():
+			self.pp_save_slots[self.current_pp_save].value_dict[k] = v["tkval"].get()
+		self.update_sliders()
+
+	def update_pp_rolodex(self):
+		self.pp_type_rolodex["menu"].delete(0, "end")
+		for opt in self.get_all_pp_func_names():
+			self.pp_type_rolodex["menu"].add_command(
+				label=opt, command=tk._setit(self.pp_type_rolodex_value, opt, self.change_pp_type_from_rolodex)
+			)
 
 	def update_save_labels(self):
 		if self.pp_save_changed:
@@ -238,30 +291,6 @@ class LiVidApp:
 				else: s["bg"] = "#00FFDD"
 			else: s["bg"] = "#00AA00"
 
-	def key_handler(self, event):
-		print(event.char, event.keysym, event.keycode)
-		if self.allow_midi_input.get() != 1:
-			try:
-				ic = int(event.char)
-				if ic > 0 and ic <= PP_SAVE_SLOT_COUNT:
-					self.switch_save((ic - 1) + (self.keyboard_trigger_bank * 8))
-			except ValueError:
-				if event.char == "-" and self.keyboard_trigger_bank > 0:
-					self.keyboard_trigger_bank -= 1
-					self.update_save_labels()
-				elif event.char == "=" and self.keyboard_trigger_bank < (PP_SAVE_SLOT_COUNT / 8 - 1):
-					self.keyboard_trigger_bank += 1
-					self.update_save_labels()
-	
-	def handle_midi_events(self):
-		if self.midi_port is not None:
-			for msg in self.midi_port.iter_pending():
-				if self.allow_midi_input.get() == 1:
-					if msg.type == "note_on" and msg.note < PP_SAVE_SLOT_COUNT:
-						self.switch_save(msg.note)
-		
-		self.gui.after(10, self.handle_midi_events)
-	
 	def update_live_mode(self):
 		self.live_mode = not self.live_mode
 
@@ -278,6 +307,37 @@ class LiVidApp:
 		
 		print(self.live_mode)
 
+	def set_info_label(self):
+		midi_info = "MIDI device connected." if self.use_midi_device else "No MIDI device connected." 
+
+		self.info_label["text"] = f"{midi_info}"
+
+	### EVENTS/MIDI
+
+	def key_handler(self, event):
+		print(event.char, event.keysym, event.keycode)
+		if self.allow_midi_input.get() != 1:
+			try:
+				ic = int(event.char)
+				if ic > 0 and ic <= PP_SAVE_SLOT_COUNT:
+					self.switch_patch((ic - 1) + (self.keyboard_trigger_bank * 8))
+			except ValueError:
+				if event.char == "-" and self.keyboard_trigger_bank > 0:
+					self.keyboard_trigger_bank -= 1
+					self.update_save_labels()
+				elif event.char == "=" and self.keyboard_trigger_bank < (PP_SAVE_SLOT_COUNT / 8 - 1):
+					self.keyboard_trigger_bank += 1
+					self.update_save_labels()
+
+	def handle_midi_events(self):
+		if self.midi_port is not None:
+			for msg in self.midi_port.iter_pending():
+				if self.allow_midi_input.get() == 1:
+					if msg.type == "note_on" and msg.note < PP_SAVE_SLOT_COUNT:
+						self.switch_patch(msg.note)
+		
+		self.gui.after(10, self.handle_midi_events)
+
 	def midi_rescan(self):
 		try:
 			self.midi_port = mido.open_input()
@@ -290,75 +350,20 @@ class LiVidApp:
 			self.live_mode_button["state"] = "disabled"
 		self.set_info_label()
 
-	def set_info_label(self):
-		midi_info = "MIDI device connected." if self.use_midi_device else "No MIDI device connected." 
+	### IMPORTANT STUFF
 
-		self.info_label["text"] = f"{midi_info}"
-	
+	def postprocess_fn(self, rgb, depth, confidence, intrinsic_matrix):
+		pp_type = self.pp_save_slots[self.current_pp_save].pp_type
+		if pp_type != self.last_pp_type:
+			print("new pp_type into cache")
+			self.pp_func_cache = self.find_pp_func_in_imported(pp_type).postprocess_raw
 
-	def save_single_patch_to_file(self):
-		with filedialog.asksaveasfile(mode='w+', defaultextension=".vvp", initialfile="New Patch.vvp") as f:
-			patch = self.pp_save_slots[self.current_pp_save].save()
-			scripts = [(n, base64.b64encode(s).decode("utf-8")) for (n, s) in self.pp_suites_imported_text]
+		self.last_pp_type = pp_type
 
-			save = {
-				"version": LIVID_VERSION,
-				"imported_scripts": scripts,
-				"patch": patch,
-			}
-
-			f.write(json.dumps(save))
-
-	def save_patch_bank_to_file(self):
-		with filedialog.asksaveasfile(mode='w+', defaultextension=".vvpb", initialfile="New Patch Bank.vvpb") as f:
-			patches = [p.save() for p in self.pp_save_slots]
-			scripts = [(n, base64.b64encode(s).decode("utf-8")) for (n, s) in self.pp_suites_imported_text]
-
-			save = {
-				"version": LIVID_VERSION,
-				"imported_scripts": scripts,
-				"patches": patches,
-				"last_save": self.current_pp_save
-			}
-
-			f.write(json.dumps(save))
-	
-	def load_patch_bank_from_file(self):
-		with filedialog.askopenfile(mode="r", defaultextension=".vvpb") as f:
-			load = json.load(f)
-			for script in load["imported_scripts"]:
-				(name, text) = (script[0], base64.b64decode(script[1]))
-				self.import_new_pp_suite_from_text(text, f.name)
-				# so __file__ == the .vvpb file (for asset reasons)
-
-			patches = [load_pp_info(p) for p in load["patches"]]
-			
-			self.pp_save_slots = patches
-			self.switch_save(load["last_save"])
-	
-	def load_single_patch_from_file(self):
-		with filedialog.askopenfile(mode="r", defaultextension=".vvp") as f:
-			load = json.load(f)
-			for script in load["imported_scripts"]:
-				(name, text) = (script[0], base64.b64decode(script[1]))
-				self.import_new_pp_suite_from_text(text, f.name)
-				# so __file__ == the .vvp file (for asset reasons)
-			
-			self.pp_save_slots[self.current_pp_save] = load_pp_info(load["patch"])
-			self.build_sliders()
-			self.update_save_labels()
-
-	def create_new_script(self):
-		tf = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "template.py"), "r")
-		template = tf.read()
-		tf.close()
-
-		f = filedialog.asksaveasfile(mode="w", defaultextension=".py", initialfile="new_script.py")
-		fname = f.name
-		f.write(template)
-		f.close()
-
-		open_file(fname)
+		return self.pp_func_cache(
+			rgb, depth, intrinsic_matrix,
+			self.pp_save_slots[self.current_pp_save].value_dict, self.zoom_x, self.zoom_y, self.zoom_amount
+		)
 
 	def run(self):
 		self.gui = tk.Tk()
@@ -430,13 +435,13 @@ class LiVidApp:
 
 		self.scripts_menu.add_command(
 			label='Load Post-Processor Function from External Script',
-			command=self.import_new_pp_suite,
+			command=self.import_new_pp_func,
 			accelerator='Command+E',
 		)
 		self.scripts_menu.add_separator()
 		self.scripts_menu.add_command(
 			label='New Script from Template',
-			command=self.create_new_script,
+			command=self.create_new_script_from_template,
 			accelerator='Command+Shift+N',
 		)
 
@@ -526,10 +531,10 @@ class LiVidApp:
 		save_patch_btn_frm.grid(column=0, row=7)
 
 		ttk.Button(
-			save_patch_btn_frm, text="Save patch", command=self.save_changes
+			save_patch_btn_frm, text="Save patch", command=self.fix_patch_changes
 		).grid(column=0, row=0, padx=5)
 		ttk.Button(
-			save_patch_btn_frm, text="Revert patch changes", command=self.revert_changes
+			save_patch_btn_frm, text="Revert patch changes", command=self.revert_patch_changes
 		).grid(column=1, row=0, padx=5)
 
 		"""
@@ -572,7 +577,7 @@ class LiVidApp:
 
 		print(self.get_all_pp_func_names())
 
-		self.switch_save(0)
+		self.switch_patch(0)
 
 		self.gui.columnconfigure(tuple(range(1)), weight=1)
 		self.gui.rowconfigure((tuple(range(1))), weight=1)
