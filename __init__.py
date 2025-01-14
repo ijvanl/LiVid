@@ -88,7 +88,7 @@ class LiVidApp:
 
 	def import_new_pp_suite_from_text(self, source_text, name):
 		code = compile(source_text, name, "exec")
-		file_globals = {}
+		file_globals = { "__file__": name }
 		exec(code, file_globals)
 		self.pp_suites_imported.extend(file_globals["__PP_FUNCTIONS_SUITE__"])
 		self.pp_suites_imported_text.append((name, source_text))
@@ -314,7 +314,9 @@ class LiVidApp:
 			load = json.load(f)
 			for script in load["imported_scripts"]:
 				(name, text) = (script[0], base64.b64decode(script[1]))
-				self.import_new_pp_suite_from_text(text, name)
+				#self.import_new_pp_suite_from_text(text, name)
+				self.import_new_pp_suite_from_text(text, f.name)
+				# so __file__ == the .vvpb file (for asset reasons)
 
 			patches = [load_pp_info(p) for p in load["patches"]]
 			

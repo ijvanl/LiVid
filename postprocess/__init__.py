@@ -1,6 +1,7 @@
-import cv2, numpy as np
-from PIL import Image, ImageFilter, ImageOps, ImageChops
+import cv2, numpy as np, colorsys
+from PIL import Image, ImageSequence, ImageFilter, ImageOps, ImageChops
 from dotmap import DotMap
+import sys, os
 
 PP_RGB = "rgb"
 PP_DEPTH = "depth"
@@ -16,6 +17,7 @@ class PPFunction:
 		self._pp_depth_frame = None
 		self._pp_intrinsic_matrix = None
 		self._pp_zoom = None
+		self._pp_frame_tick = 0
 	
 	def values(self):
 		return {}
@@ -26,6 +28,8 @@ class PPFunction:
 	def postprocess_raw(self, rgb, depth, intrinsic_matrix, pp, zoom_x, zoom_y, zoom_amount):
 		global _PP_LAST_IMAGE, _PP_LAST_IMAGE_SET
 
+		self._pp_frame_tick += 1
+
 		self._pp_zoom = (zoom_x, zoom_y, zoom_amount)
 		self._pp_intrinsic_matrix = intrinsic_matrix
 
@@ -33,7 +37,7 @@ class PPFunction:
 			screen = np.swapaxes(rgb, 0, 1)
 			self._pp_rgb_frame = Image.fromarray(screen).convert("RGB").resize((640, 480), resample=2)
 			self._pp_rgb_frame = self._pp_rgb_frame.transpose(Image.FLIP_LEFT_RIGHT)
-			self._pp_rgb_frame_zoomed = zoom_at(self._pp_rgb_frame, zoom_x, zoom_y, zoom_amount)
+			self._pp_rgb_frame_zoomed = _zoom_at(self._pp_rgb_frame, zoom_x, zoom_y, zoom_amount)
 		
 		if PP_DEPTH in self._pp_use_streams:
 			self._pp_depth_frame = np.swapaxes(depth, 0, 1)
@@ -45,6 +49,9 @@ class PPFunction:
 		_PP_LAST_IMAGE_SET = False
 		return np.array(image)
 
+	def tick(self):
+		return self._pp_frame_tick
+
 	def rgb(self, zoom=True):
 		return (self._pp_rgb_frame_zoomed if zoom else self._pp_rgb_frame)
 
@@ -53,7 +60,7 @@ class PPFunction:
 		screen = np.clip(self._pp_depth_frame * contrast, 0.0, 1.0)
 		screen_img = Image.fromarray(screen * 255).convert("RGB").resize((640, 480), resample=2)
 		screen_img = screen_img.transpose(Image.FLIP_LEFT_RIGHT)
-		return (zoom_at(screen_img, *self._pp_zoom) if zoom else screen_img)
+		return (_zoom_at(screen_img, *self._pp_zoom) if zoom else screen_img)
 	
 	def depth_bound(self, lower: float, upper: float, contrast: float, zoom=True):
 		screen = self._pp_depth_frame
@@ -63,7 +70,7 @@ class PPFunction:
 		screen_img = Image.fromarray(screen * 255).convert("RGB").resize((640, 480), resample=2)
 
 		screen_img = screen_img.transpose(Image.FLIP_LEFT_RIGHT)
-		return (zoom_at(screen_img, *self._pp_zoom) if zoom else screen_img)
+		return (_zoom_at(screen_img, *self._pp_zoom) if zoom else screen_img)
 	
 	def last_image(self, set=None):
 		global _PP_LAST_IMAGE, _PP_LAST_IMAGE_SET
@@ -78,7 +85,7 @@ class PPFunction:
 			_PP_LAST_IMAGE_SET = True
 			return last
 
-def zoom_at(img, x, y, zoom):
+def _zoom_at(img, x, y, zoom):
 	w, h = img.size
 	zoom2 = zoom * 2
 	img = img.crop(
