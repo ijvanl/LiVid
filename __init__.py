@@ -10,7 +10,7 @@ from tkinter import filedialog
 from tkinter import ttk
 
 import threading
-import sys, os
+import sys, os, subprocess
 import base64
 import pickle
 import json
@@ -32,7 +32,8 @@ class VideoPPInfo:
 		return literal_eval(str(self.__dict__))
 
 	def load(self, d: dict):
-		self.value_dict = d
+		self.pp_type = d["pp_type"]
+		self.value_dict = d["value_dict"]
 
 def load_pp_info(d: dict):
 	pp = VideoPPInfo.default()
@@ -295,8 +296,21 @@ class LiVidApp:
 		self.info_label["text"] = f"{midi_info}"
 	
 
+	def save_single_patch_to_file(self):
+		with filedialog.asksaveasfile(mode='w+', defaultextension=".vvp", initialfile="New Patch.vvp") as f:
+			patch = self.pp_save_slots[self.current_pp_save].save()
+			scripts = [(n, base64.b64encode(s).decode("utf-8")) for (n, s) in self.pp_suites_imported_text]
+
+			save = {
+				"version": LIVID_VERSION,
+				"imported_scripts": scripts,
+				"patch": patch,
+			}
+
+			f.write(json.dumps(save))
+
 	def save_patch_bank_to_file(self):
-		with filedialog.asksaveasfile(mode='w+', defaultextension=".vvpb") as f:
+		with filedialog.asksaveasfile(mode='w+', defaultextension=".vvpb", initialfile="New Patch Bank.vvpb") as f:
 			patches = [p.save() for p in self.pp_save_slots]
 			scripts = [(n, base64.b64encode(s).decode("utf-8")) for (n, s) in self.pp_suites_imported_text]
 
@@ -314,7 +328,6 @@ class LiVidApp:
 			load = json.load(f)
 			for script in load["imported_scripts"]:
 				(name, text) = (script[0], base64.b64decode(script[1]))
-				#self.import_new_pp_suite_from_text(text, name)
 				self.import_new_pp_suite_from_text(text, f.name)
 				# so __file__ == the .vvpb file (for asset reasons)
 
@@ -322,7 +335,30 @@ class LiVidApp:
 			
 			self.pp_save_slots = patches
 			self.switch_save(load["last_save"])
+	
+	def load_single_patch_from_file(self):
+		with filedialog.askopenfile(mode="r", defaultextension=".vvp") as f:
+			load = json.load(f)
+			for script in load["imported_scripts"]:
+				(name, text) = (script[0], base64.b64decode(script[1]))
+				self.import_new_pp_suite_from_text(text, f.name)
+				# so __file__ == the .vvp file (for asset reasons)
+			
+			self.pp_save_slots[self.current_pp_save] = load_pp_info(load["patch"])
+			self.build_sliders()
+			self.update_save_labels()
 
+	def create_new_script(self):
+		tf = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "template.py"), "r")
+		template = tf.read()
+		tf.close()
+
+		f = filedialog.asksaveasfile(mode="w", defaultextension=".py", initialfile="new_script.py")
+		fname = f.name
+		f.write(template)
+		f.close()
+
+		open_file(fname)
 
 	def run(self):
 		self.gui = tk.Tk()
@@ -360,6 +396,60 @@ class LiVidApp:
 		self.live_mode = tk.IntVar()
 		self.pp_type_rolodex_value = tk.StringVar() # for the ttk.Combobox used to choose postprocessing type
 
+		# create menu
+		self.gui.option_add('*tearOff', tk.FALSE)
+
+		self.menubar = tk.Menu(self.gui)
+		self.gui.config(menu=self.menubar)
+		
+		self.file_menu = tk.Menu(self.menubar)
+
+		self.file_menu.add_command(
+			label='Open Patch Bank...',
+			command=self.load_patch_bank_from_file,
+			accelerator='Command+O',
+		)
+		self.file_menu.add_command(
+			label='Load Single Patch from File...',
+			command=self.load_single_patch_from_file,
+			accelerator='Command+Shift+O',
+		)
+		self.file_menu.add_separator()
+		self.file_menu.add_command(
+			label='Export All Patches as Bank...',
+			command=self.save_patch_bank_to_file,
+			accelerator='Command+S',
+		)
+		self.file_menu.add_command(
+			label='Export Current Patch...',
+			command=self.save_single_patch_to_file,
+			accelerator='Command+E',
+		)
+
+		self.scripts_menu = tk.Menu(self.menubar)
+
+		self.scripts_menu.add_command(
+			label='Load Post-Processor Function from External Script',
+			command=self.import_new_pp_suite,
+			accelerator='Command+E',
+		)
+		self.scripts_menu.add_separator()
+		self.scripts_menu.add_command(
+			label='New Script from Template',
+			command=self.create_new_script,
+			accelerator='Command+Shift+N',
+		)
+
+		self.menubar.add_cascade(
+			label="File",
+			menu=self.file_menu
+		)
+
+		self.menubar.add_cascade(
+			label="Scripts",
+			menu=self.scripts_menu
+		)
+
 		frm = ttk.Frame(self.gui, padding=10)
 		frm.pack(fill=tk.BOTH, expand=True)
 
@@ -374,15 +464,11 @@ class LiVidApp:
 		self.optfrm.grid(column=0, row=4, pady=10)
 
 		pp_type_frm = ttk.Frame(self.optfrm)
-		ttk.Label(pp_type_frm, text=f"Post-processing algorithm:").pack(side=tk.LEFT, padx=3)
+		ttk.Label(pp_type_frm, text=f"Post-processor function:").pack(side=tk.LEFT, padx=3)
 		self.pp_type_rolodex = ttk.OptionMenu(
 			pp_type_frm, self.pp_type_rolodex_value, "PPDepth", command=self.change_pp_type_from_rolodex
 		)
 		self.pp_type_rolodex.pack(side=tk.LEFT, padx=0)
-		ttk.Separator(pp_type_frm, orient="vertical").pack(side=tk.LEFT, ipady=7, padx=15)
-		ttk.Button(
-			pp_type_frm, text="Import post-processor module from Python script", command=self.import_new_pp_suite
-		).pack(side=tk.LEFT)
 
 		pp_type_frm.grid(column=0, row=0, pady=5, columnspan=3)
 
@@ -446,6 +532,7 @@ class LiVidApp:
 			save_patch_btn_frm, text="Revert patch changes", command=self.revert_changes
 		).grid(column=1, row=0, padx=5)
 
+		"""
 		save_file_btn_frm = ttk.Frame(frm)
 		save_file_btn_frm.grid(column=0, row=8)
 
@@ -455,6 +542,7 @@ class LiVidApp:
 		ttk.Button(
 			save_file_btn_frm, text="Load patch bank from file", command=self.load_patch_bank_from_file
 		).grid(column=1, row=0, padx=5)
+		"""
 
 		self.allow_midi_button = ttk.Checkbutton(
 			frm, text="Use MIDI input to switch patches", variable=self.allow_midi_input
@@ -503,6 +591,13 @@ class LiVidApp:
 		self.gui.after(50, lambda: self.device.display_stream_frame(self.gui))
 		self.gui.after(50, self.handle_midi_events)
 		self.gui.mainloop()
+
+def open_file(filename):
+	if sys.platform == "win32":
+		os.startfile(filename)
+	else:
+		opener = "open" if sys.platform == "darwin" else "xdg-open"
+		subprocess.call([opener, filename])
 
 #########
 
