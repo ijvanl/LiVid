@@ -5,5 +5,4 @@ if __name__ == '__main__':
 
 	dev = lidar.LidarDevice(app.postprocess_fn)
 
-
 	app.run(dev)
