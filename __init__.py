@@ -370,31 +370,32 @@ class LiVidApp:
 
 		self.gui.title('LiVid')
 
-		self.waiting_frame = ttk.Frame(self.gui, padding=50)
-		tk.Label(
-			self.waiting_frame,
-			text="Waiting for connection to iPhone.",
-			font=("System", 25, "bold")
-		).pack()
-		tk.Label(
-			self.waiting_frame,
-			text="Open the Record3D app on iPhone, then follow the instructions for USB Streaming Mode.",
-			font=("System", 15)
-		).pack()
+		if os.environ.get("GUIONLY") is None:
+			self.waiting_frame = ttk.Frame(self.gui, padding=50)
+			tk.Label(
+				self.waiting_frame,
+				text="Waiting for connection to iPhone.",
+				font=("System", 25, "bold")
+			).pack()
+			tk.Label(
+				self.waiting_frame,
+				text="Open the Record3D app on iPhone, then follow the instructions for USB Streaming Mode.",
+				font=("System", 15)
+			).pack()
 
-		self.waiting_frame.grid()
+			self.waiting_frame.grid()
 
-		waiting = True
+			waiting = True
 
-		while waiting:
-			try:
-				self.device.connect_to_device(dev_idx=0)
-				self.device.start() # start device thread
-				self.waiting_frame.grid_forget()
-				waiting = False
-			except:
-				self.gui.update_idletasks()
-				self.gui.update()
+			while waiting:
+				try:
+					self.device.connect_to_device(dev_idx=0)
+					self.device.start() # start device thread
+					self.waiting_frame.grid_forget()
+					waiting = False
+				except:
+					self.gui.update_idletasks()
+					self.gui.update()
 
 		# create control variables here (dumb)
 		self.allow_midi_input = tk.IntVar()
@@ -612,14 +613,16 @@ if __name__ == '__main__':
 """
 
 if __name__ == '__main__':
-	dev = lidar.LidarDevice()
-	app = LiVidApp(dev)
+	#dev = lidar.LidarDevice()
+	#app = LiVidApp(dev)
 
-	app.run()
+	#app.run()
 
-	"""if os.environ.get("GUIONLY") is not None:
-		app = LiVidApp()
+	if os.environ.get("GUIONLY") is not None:
 		dev = lidar.FakeLidarDevice()
-		dev.start()
-		app.run(dev)
-	else:"""
+		app = LiVidApp(dev)
+		app.run()
+	else:
+		dev = lidar.LidarDevice()
+		app = LiVidApp(dev)
+		app.run()
