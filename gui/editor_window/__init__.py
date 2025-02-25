@@ -1,13 +1,12 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-import aux as aux, editor
 import os, sys
 import math
 
 from enum import Enum
 
 from mapping import *
-from aux import *
+from gui.aux import *
 
 from model import LiVidModel
 
@@ -38,11 +37,13 @@ class LiVidEditorWindowFrame(tk.Frame):
 
 	def on_modified(self):
 		if self.model.get_current_patch() is not None:
-			self.model.get_current_patch()["text"] = self.editor.get_text()
+			self.model.get_current_patch().text = self.editor.get_text()
+			self.model.get_current_patch().update_code()
 
 	def before_patch_selected(self, event):
 		if self.model.get_current_patch() is not None:
-			self.model.get_current_patch()["text"] = self.editor.get_text()
+			self.model.get_current_patch().text = self.editor.get_text()
+			self.model.get_current_patch().update_code()
 
 	def after_patch_selected(self, event):
 		if self.model.get_current_patch() is None:
@@ -50,4 +51,5 @@ class LiVidEditorWindowFrame(tk.Frame):
 			self.editor.text.config(state=tk.DISABLED)
 		else:
 			self.editor.text.config(state=tk.NORMAL)
-			self.editor.open_text(self.model.get_current_patch()["text"])
+			self.editor.open_text(self.model.get_current_patch().text)
+			self.model.get_current_patch().update_code()

@@ -1,11 +1,12 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-import aux as aux, editor
+from gui import aux
 import os, sys
 
 from model import LiVidModel
-from editor_window import LiVidEditorWindowFrame
-from mapping_window import LiVidMappingWindowFrame
+from gui.patch_window import LiVidPatchWindowFrame
+from gui.editor_window import LiVidEditorWindowFrame
+from gui.mapping_window import LiVidMappingWindowFrame
 
 
 class LiVidMainWindow(tk.Toplevel):
@@ -22,6 +23,7 @@ class LiVidMainWindow(tk.Toplevel):
 
 		self.current_tab = "Editor"
 		self.tabs = {
+			"Patch": LiVidPatchWindowFrame(self, model),
 			"Editor": LiVidEditorWindowFrame(self, model),
 			"Mappings": LiVidMappingWindowFrame(self, model),
 		}
@@ -120,6 +122,7 @@ class LiVidMainWindow(tk.Toplevel):
 		self.tab_buttons[tab].config(state="disabled")
 		
 		self.current_tab = tab
+		self.update_idletasks()
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ class PatchName(PPFunction): # TODO: change the name of this class (to something
 	
 	def values(self):
 		return {
-			"value_1": ("Value 1", 0.1, 1.0, 10.0),
+			"value_1": 0.1,
 		}
 	
 	def postprocess(self, pp):

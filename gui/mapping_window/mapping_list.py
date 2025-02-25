@@ -1,13 +1,12 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-import aux as aux, editor
 import os, sys
 import math
 
 from enum import Enum
 
 from mapping import *
-from aux import *
+from gui.aux import *
 
 from . import *
 from .rung import *
@@ -27,11 +26,11 @@ class MappingListbox(ttk.Frame):
 		return self.iid_counter
 	
 	def add_new_mapping(self):
-		self.model.get_current_patch()["mappings"].append(Mapping.default())
+		self.model.get_current_patch().mappings.append(Mapping.default())
 		self.update_from_patch()
 	
 	def remove_mapping(self, i):
-		self.model.get_current_patch()["mappings"].pop(i)
+		self.model.get_current_patch().mappings.pop(i)
 		self.update_from_patch()
 
 	def build_gui(self):
@@ -57,9 +56,7 @@ class MappingListbox(ttk.Frame):
 			del child
 
 		if patch is not None:
-			mappings = patch["mappings"]
-			
-			for (i, mapping) in enumerate(mappings):
+			for (i, mapping) in enumerate(patch.mappings):
 				element_frame = ttk.Frame(self.list_frame)
 				element_frame.columnconfigure(0, weight=1)
 

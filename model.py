@@ -17,16 +17,16 @@ class Patch:
 
 	def update_code(self):
 		code = compile(self.text, self.name, "exec")
-		file_globals = self.model.script_world + { "__file__": self.name }
+		file_globals = dict(self.model.script_world, **{ "__file__": self.name })
 		exec(code, file_globals)
 		self.patch_struct = file_globals["__PP_FUNCTIONS_SUITE__"]
-	
+
 	def values(self):
 		if self.patch_struct is None:
 			self.update_code()
 		if self.error is not None:
 			return None
-		return self.patch_struct.values()
+		return self.patch_struct[0].values()
 
 class LiVidModel:
 	def __init__(self):
@@ -36,7 +36,7 @@ class LiVidModel:
 		self.current_patch_name = None
 	
 	def add_patch(self, name):
-		self.patches[name] = Patch(name, str(TEMPLATE_STRING), [])
+		self.patches[name] = Patch(self, name, str(TEMPLATE_STRING), [])
 	
 	def get_current_patch(self):
 		if self.current_patch_name is not None:

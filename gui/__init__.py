@@ -1,6 +1,6 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-import aux
+from . import aux
 import os, sys
 
 from model import *
@@ -10,7 +10,7 @@ TEMPLATE_STRING = tf.read()
 tf.close()
 
 def run_gui(model):
-	import main_window
+	from . import main_window
 
 	root = tk.Tk()
 	root.withdraw()

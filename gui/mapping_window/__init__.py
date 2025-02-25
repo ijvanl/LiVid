@@ -1,16 +1,16 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-import aux as aux, editor
 import os, sys
 import math
 
 from enum import Enum
 
 from mapping import *
-from aux import *
+from gui.aux import *
 
-from __init__ import LiVidModelStub
 from .mapping_list import *
+
+from model import LiVidModel
 
 
 def try_int(x):
@@ -19,7 +19,7 @@ def try_int(x):
 
 
 class LiVidMappingWindowFrame(tk.Frame):
-	def __init__(self, master, model):
+	def __init__(self, master, model: LiVidModel):
 		super().__init__(master)
 		self.model = model
 
@@ -46,6 +46,8 @@ class LiVidMappingWindowFrame(tk.Frame):
 		self.mapping_list.pack()
 
 	def on_tab_open(self):
+		if self.model.get_current_patch() is not None:
+			self.model.get_current_patch().update_code()
 		self.mapping_list.update_from_patch()
 
 	def before_patch_selected(self, event):
@@ -59,4 +61,6 @@ class LiVidMappingWindowFrame(tk.Frame):
 			self.alt_frame.grid_remove()
 			self.main_frame.grid()
 			self.patch_name_label["text"] = self.model.current_patch_name
+			if self.model.get_current_patch() is not None:
+				self.model.get_current_patch().update_code()
 			self.mapping_list.update_from_patch()

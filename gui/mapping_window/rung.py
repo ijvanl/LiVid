@@ -1,15 +1,12 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-import aux as aux, editor
 import os, sys
 import math
 
 from enum import Enum
 
 from mapping import MidiEvent, ValueMapping, EVENT_TYPES
-from aux import *
-
-from __init__ import LiVidModelStub
+from gui.aux import *
 
 def try_int(x):
 	try: return int(x)
@@ -82,7 +79,7 @@ class MappingDisplay(ttk.Frame):
 		self.build_gui()
 	
 	def build_gui(self):
-		patch_values = list(self.model.get_current_patch()["values"].keys())
+		patch_values = list(self.model.get_current_patch().values().keys())
 
 		(tk_lhs, tk_rhs) = (tk.StringVar(self), tk.StringVar(self))
 
