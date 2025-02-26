@@ -8,7 +8,7 @@ from enum import Enum
 from mapping import *
 from gui.aux import *
 
-from model import LiVidModel
+from model import LiVidModelController
 
 from .editor import *
 
@@ -18,7 +18,7 @@ def try_int(x):
 
 
 class LiVidEditorWindowFrame(tk.Frame):
-	def __init__(self, master, model: LiVidModel):
+	def __init__(self, master, model: LiVidModelController):
 		super().__init__(master)
 		self.model = model
 

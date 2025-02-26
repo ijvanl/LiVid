@@ -2,14 +2,14 @@ import cv2, numpy as np
 from PIL import Image, ImageFilter, ImageOps, ImageChops
 from postprocess import *
 
-class PPVideo(PPFunction):
+class PPVideo(PatchClass):
 	def __init__(self):
 		super().__init__(use_streams=[PP_RGB])
 	
 	def postprocess(self, values):
 		return self.rgb()
 
-class PPDepth(PPFunction):
+class PPDepth(PatchClass):
 	def __init__(self):
 		super().__init__(use_streams=[PP_DEPTH])
 	
@@ -19,7 +19,7 @@ class PPDepth(PPFunction):
 	def postprocess(self, pp):
 		return self.depth(pp.contrast)
 
-class PPSilhouette(PPFunction):
+class PPSilhouette(PatchClass):
 	def __init__(self):
 		super().__init__(use_streams=[PP_DEPTH])
 	
@@ -35,7 +35,7 @@ class PPSilhouette(PPFunction):
 	def postprocess(self, pp):
 		return self.depth_bound(pp.lower_bound, pp.upper_bound, pp.contrast)
 
-class PPOutline(PPFunction):
+class PPOutline(PatchClass):
 	def __init__(self):
 		super().__init__(use_streams=[PP_DEPTH])
 	

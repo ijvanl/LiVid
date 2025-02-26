@@ -34,7 +34,7 @@ def load_local_texture(fn):
 	return load_texture_from_abspath(os.path.join(cpath, fn))
 
 
-class PPTextureFunction(pp.PPFunction):
+class PPTextureFunction(pp.PatchClass):
 	"""Subclass of `PPFunction` with utilities for loading and using image files as textures, especially animated GIFs."""
 	def __init__(self, use_streams=[pp.PP_DEPTH], textures=[]):
 		super().__init__(use_streams=use_streams)

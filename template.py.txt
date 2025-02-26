@@ -5,7 +5,8 @@ from postprocess import *
 from postprocess.tools import *
 
 
-class PatchName(PPFunction): # TODO: change the name of this class (to something cool!)
+@patch
+class MyPatch(PatchClass): # TODO: change the name of this class (to something cool!)
 	def __init__(self):
 		super().__init__(use_streams=[PP_DEPTH])
 	
@@ -17,6 +18,3 @@ class PatchName(PPFunction): # TODO: change the name of this class (to something
 	def postprocess(self, pp):
 		screen = self.depth(pp.value_1)
 		return screen # Finally, return your final processed image.
-
-
-__PP_FUNCTIONS_SUITE__ = [PatchName()] # TODO: update with the new, cool name of my class

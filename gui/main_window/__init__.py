@@ -1,18 +1,19 @@
 import tkinter as tk
 import tkinter.ttk as ttk
+import tkinter.messagebox as mbox
 from gui import aux
 import os, sys
 
-from model import LiVidModel
+from model import LiVidModelController
 from gui.patch_window import LiVidPatchWindowFrame
 from gui.editor_window import LiVidEditorWindowFrame
 from gui.mapping_window import LiVidMappingWindowFrame
 
 
 class LiVidMainWindow(tk.Toplevel):
-	def __init__(self, master, model):
+	def __init__(self, master, mc: LiVidModelController):
 		super().__init__(master)
-		self.model = model
+		self.mc = mc
 
 		style = ttk.Style()
 		style.configure("Tab.TLabel", font=("System", 10))
@@ -23,14 +24,14 @@ class LiVidMainWindow(tk.Toplevel):
 
 		self.current_tab = "Editor"
 		self.tabs = {
-			"Patch": LiVidPatchWindowFrame(self, model),
-			"Editor": LiVidEditorWindowFrame(self, model),
-			"Mappings": LiVidMappingWindowFrame(self, model),
+			"Patch": LiVidPatchWindowFrame(self, mc),
+			"Editor": LiVidEditorWindowFrame(self, mc),
+			"Mappings": LiVidMappingWindowFrame(self, mc),
 		}
 		self.tab_buttons = {}
 		
 		self.build_gui()
-		self.geometry('1000x800')
+		self.geometry('1200x800')
 
 		self.on_patch_selected(None)
 
@@ -46,6 +47,9 @@ class LiVidMainWindow(tk.Toplevel):
 	
 		ttk.Separator(self.tab_bar).grid(column=0, row=1, columnspan=10, sticky=tk.E + tk.W)
 		self.tab_bar.columnconfigure(len(self.tab_buttons), weight=1)
+
+		self.play_button = aux.RoledButton(self.tab_bar, role="play", command=self.play)
+		self.play_button.grid(column=len(self.tab_buttons) + 1, row=0, padx=5)
 
 		self.patch_listbox = aux.ScrollListbox(self)
 		self.patch_listbox.set_update_callback(self.on_patch_selected)
@@ -69,36 +73,44 @@ class LiVidMainWindow(tk.Toplevel):
 		self.columnconfigure(1, weight=1)
 		self.rowconfigure(1, weight=1)
 
+	def play(self):
+		try:
+			self.mc.backend.start_displaying()
+		except RuntimeError:
+			mbox.showwarning(
+				None, "No device connected!",
+				detail="Try connecting a compatible device, checking your connection, or adjusting your project settings."
+			)
 
 	def on_patch_selected(self, event):
 		for tab in self.tabs.values():
 			tab.before_patch_selected(event)
 		
 		selection = self.patch_listbox.listbox.selection()
-		self.model.current_patch_name = selection[0] if (selection is not None) and len(selection) == 1 else None
+		self.mc.current_patch_name = selection[0] if (selection is not None) and len(selection) == 1 else None
 
 		for tab in self.tabs.values():
 			tab.after_patch_selected(event)
 
 	def add_patch(self):
 		print("add patch")
-		patch_name = f"Patch #{len(self.model.patches)}"
-		self.model.add_patch(patch_name)
+		patch_name = f"Patch #{len(self.mc.patches)}"
+		self.mc.add_patch(patch_name)
 		self.update_patch_listbox(patch_name)
 
 	def remove_current_patch(self):
 		print("remove current patch")
-		if self.model.current_patch_name is not None:
-			self.model.remove_patch(self.model.current_patch_name)
-			self.model.current_patch_name = None
+		if self.mc.current_patch_name is not None:
+			self.mc.remove_patch(self.mc.current_patch_name)
+			self.mc.current_patch_name = None
 			self.update_patch_listbox(())
 
 	def update_patch_listbox(self, new_index=None):
 		if new_index == None:
-			new_index = self.model.current_patch_name if self.model.current_patch_name is not None else self.patch_listbox.listbox.selection()
+			new_index = self.mc.current_patch_name if self.mc.current_patch_name is not None else self.patch_listbox.listbox.selection()
 		
 		self.patch_listbox.clear()
-		for k in self.model.patches.keys():
+		for k in self.mc.patches.keys():
 			self.patch_listbox.insert("end", k, text=k)
 		
 		self.patch_listbox.listbox.selection_set(new_index)
@@ -127,7 +139,7 @@ class LiVidMainWindow(tk.Toplevel):
 
 if __name__ == "__main__":
 	root = tk.Tk()
-	model = LiVidModel()
+	model = LiVidModelController()
 	t = LiVidMainWindow(root, model)
 	#t.pack(expand=True, fill=tk.BOTH)
 	root.mainloop()

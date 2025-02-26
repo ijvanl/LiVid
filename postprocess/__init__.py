@@ -9,7 +9,7 @@ PP_DEPTH = "depth"
 _PP_LAST_IMAGE = None
 _PP_LAST_IMAGE_SET = False
 
-class PPFunction:
+class PatchClass:
 	def __init__(self, use_streams=[PP_DEPTH]):
 		self._pp_use_streams = use_streams
 		self._pp_rgb_frame = None
@@ -93,3 +93,11 @@ def _zoom_at(img, x, y, zoom):
 		x + w / zoom2, y + h / zoom2)
 	)
 	return img.resize((w, h))
+
+def patch(cls):
+	"""Class decorator for patch postprocessor classes"""
+	import inspect
+	caller_frame = inspect.stack()[1]
+	caller_module = inspect.getmodule(caller_frame[0])
+	caller_module.__dict__["__PP_CLASS__"] = cls
+	return cls

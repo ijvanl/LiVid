@@ -8,14 +8,14 @@ from enum import Enum
 from mapping import *
 from gui.aux import *
 
-from model import LiVidModel
+from model import LiVidModelController
 
 
 class LiVidPatchWindowFrame(tk.Frame):
-	def __init__(self, master, model: LiVidModel):
+	def __init__(self, master, mc: LiVidModelController):
 		super().__init__(master)
 		self.main_window = master
-		self.model = model
+		self.mc = mc
 
 		self.build_gui()
 		#self.on_patch_selected(None)
@@ -36,20 +36,20 @@ class LiVidPatchWindowFrame(tk.Frame):
 		self.patch_name = tk.StringVar(self, "Patch")
 
 		def _patch_name_change(*_):
-			if self.model.current_patch_name is not None and self.patch_name.get() != self.model.current_patch_name:
+			if self.mc.current_patch_name is not None and self.patch_name.get() != self.mc.current_patch_name:
 				new_name = self.patch_name.get()
-				old_name = str(self.model.current_patch_name)
+				old_name = str(self.mc.current_patch_name)
 
-				if len(new_name) > 0 and not (new_name in self.model.patches):
-					self.model.patches[old_name].name = new_name
-					self.model.patches[new_name] = self.model.patches.pop(old_name)
+				if len(new_name) > 0 and not (new_name in self.mc.patches):
+					self.mc.patches[old_name].name = new_name
+					self.mc.patches[new_name] = self.mc.patches.pop(old_name)
 					self.main_window.update_patch_listbox(new_index=new_name)
-					self.model.current_patch_name = new_name
-				elif new_name in self.model.patches:
-					self.model.patches[old_name].name = f"{new_name} 1"
-					self.model.patches[f"{new_name} 1"] = self.model.patches.pop(old_name)
+					self.mc.current_patch_name = new_name
+				elif new_name in self.mc.patches:
+					self.mc.patches[old_name].name = f"{new_name} 1"
+					self.mc.patches[f"{new_name} 1"] = self.mc.patches.pop(old_name)
 					self.main_window.update_patch_listbox(new_index=f"{new_name} 1")
-					self.model.current_patch_name = f"{new_name} 1"
+					self.mc.current_patch_name = f"{new_name} 1"
 
 		self.patch_name.trace_add("write", _patch_name_change)
 
@@ -62,11 +62,11 @@ class LiVidPatchWindowFrame(tk.Frame):
 		self.patch_name_display.grid(column=0, row=0)
 
 	def update_data(self):
-		if self.model.get_current_patch() is not None:
+		if self.mc.get_current_patch() is not None:
 			self.alt_frame.grid_remove()
 			self.main_frame.grid()
 			
-			self.patch_name.set(self.model.current_patch_name)
+			self.patch_name.set(self.mc.current_patch_name)
 		else:
 			self.main_frame.grid_remove()
 			self.alt_frame.grid()
