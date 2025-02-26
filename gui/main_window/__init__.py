@@ -81,6 +81,9 @@ class LiVidMainWindow(tk.Toplevel):
 				None, "No device connected!",
 				detail="Try connecting a compatible device, checking your connection, or adjusting your project settings."
 			)
+	
+	def backend_checkup(self):
+		self.mc.backend.device.is_presenting
 
 	def on_patch_selected(self, event):
 		for tab in self.tabs.values():

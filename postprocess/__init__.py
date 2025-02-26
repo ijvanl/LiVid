@@ -97,7 +97,5 @@ def _zoom_at(img, x, y, zoom):
 def patch(cls):
 	"""Class decorator for patch postprocessor classes"""
 	import inspect
-	caller_frame = inspect.stack()[1]
-	caller_module = inspect.getmodule(caller_frame[0])
-	caller_module.__dict__["__PP_CLASS__"] = cls
+	inspect.stack()[1][0].f_globals["__PP_CLASS__"] = cls()
 	return cls

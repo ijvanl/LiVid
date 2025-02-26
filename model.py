@@ -1,13 +1,15 @@
 import os, sys
 import video
 
+import logging
+
 tf = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "template.py.txt"), "r")
 TEMPLATE_STRING = tf.read()
 tf.close()
 
 class Patch:
-	def __init__(self, model, name, text, mappings):
-		self.model = model
+	def __init__(self, mc, name, text, mappings):
+		self.mc = mc
 		self.name = name
 		self.text = text
 		self.mappings = mappings
@@ -18,9 +20,9 @@ class Patch:
 
 	def update_code(self):
 		code = compile(self.text, self.name, "exec")
-		file_globals = dict(self.model.script_world, **{ "__file__": self.name })
+		file_globals = dict(self.mc.script_world, **{ "__file__": self.name })
 		exec(code, file_globals)
-		self.patch_struct = file_globals["__PP_FUNCTION__"]
+		self.patch_struct = file_globals["__PP_CLASS__"]
 
 	def values(self):
 		if self.patch_struct is None:
@@ -31,8 +33,11 @@ class Patch:
 
 class LiVidModelController:
 	def __init__(self, backend: video.VideoRenderer):
+		self.logger = logging.getLogger(__name__)
+
 		self.backend = backend
-		self.backend.model = self
+		self.backend.set_mc(self)
+		self.backend.start()
 		self.script_world = {}
 		self.patch_triggers = {}
 		self.patches = {}
