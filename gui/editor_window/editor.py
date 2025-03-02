@@ -45,11 +45,7 @@ class PatchTextEditor(ttk.Frame):
 		if (self.text_modified == False) and (self.modified_event is not None):
 			self.modified_event(event)
 		self.text_modified = True
-		self.resize_to_length()
 		self.text.edit_modified(False)
-
-	def resize_to_length(self):
-		self.text["height"] = int(self.text.index("end-1c").split(".")[0])
 
 	def get_text(self):
 		return self.text.get("1.0", "end-1c") # from line 1 column 0 (1.0), to end minus trailing \n (end-1c)
