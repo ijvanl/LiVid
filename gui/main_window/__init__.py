@@ -5,6 +5,7 @@ from gui import aux
 import os, sys
 
 from model import LiVidModelController
+from gui.project_window import LiVidProjectWindowFrame
 from gui.patch_window import LiVidPatchWindowFrame
 from gui.editor_window import LiVidEditorWindowFrame
 from gui.mapping_window import LiVidMappingWindowFrame
@@ -32,9 +33,10 @@ class LiVidMainWindow(tk.Toplevel):
 
 		self.current_tab = "Editor"
 		self.tabs = {
-			"Patch": LiVidPatchWindowFrame(self, mc),
-			"Editor": LiVidEditorWindowFrame(self, mc),
-			"Mappings": LiVidMappingWindowFrame(self, mc),
+			"Project": (LiVidProjectWindowFrame(self, mc), False),
+			"Patch": (LiVidPatchWindowFrame(self, mc), True),
+			"Editor": (LiVidEditorWindowFrame(self, mc), True),
+			"Mappings": (LiVidMappingWindowFrame(self, mc), True),
 		}
 		self.tab_buttons = {}
 		
@@ -74,20 +76,20 @@ class LiVidMainWindow(tk.Toplevel):
 		self.patch_listbox.set_update_callback(self.on_patch_selected)
 		self.patch_listbox.grid(column=0, row=1, sticky=tk.N + tk.S + tk.E + tk.W)
 
-		patch_list_bar = ttk.Frame(self)
-		patch_list_bar.grid(column=0, row=2, sticky=tk.E + tk.W, ipady=2)
+		self.patch_list_bar = ttk.Frame(self)
+		self.patch_list_bar.grid(column=0, row=2, sticky=tk.E + tk.W, ipady=2)
 
-		self.add_patch_button = aux.RoledButton(patch_list_bar, role="add", command=self.add_patch)
+		self.add_patch_button = aux.RoledButton(self.patch_list_bar, role="add", command=self.add_patch)
 		self.add_patch_button.grid(column=2, row=0, padx=5)
 
-		self.remove_patch_button = aux.RoledButton(patch_list_bar, role="remove", command=self.remove_current_patch)
+		self.remove_patch_button = aux.RoledButton(self.patch_list_bar, role="remove", command=self.remove_current_patch)
 		self.remove_patch_button.grid(column=1, row=0, padx=(5, 0))
 
-		patch_list_bar.columnconfigure(0, weight=1)
+		self.patch_list_bar.columnconfigure(0, weight=1)
 
 		for tab in self.tabs.values():
-			tab.grid(column=1, row=1, rowspan=2, sticky=tk.N + tk.S + tk.E + tk.W)
-			tab.grid_remove()
+			tab[0].grid(column=1, row=1, rowspan=2, sticky=tk.N + tk.S + tk.E + tk.W)
+			tab[0].grid_remove()
 
 		self.columnconfigure(1, weight=1)
 		self.rowconfigure(1, weight=1)
@@ -128,13 +130,13 @@ class LiVidMainWindow(tk.Toplevel):
 
 	def on_patch_selected(self, event):
 		for tab in self.tabs.values():
-			tab.before_patch_selected(event)
+			tab[0].before_patch_selected(event)
 		
 		selection = self.patch_listbox.listbox.selection()
 		self.mc.current_patch_name = selection[0] if (selection is not None) and len(selection) == 1 else None
 
 		for tab in self.tabs.values():
-			tab.after_patch_selected(event)
+			tab[0].after_patch_selected(event)
 
 	def add_patch(self):
 		print("add patch")
@@ -178,12 +180,19 @@ class LiVidMainWindow(tk.Toplevel):
 	def switch_tabs(self, tab):
 		for button in self.tab_buttons.values(): button.config(state="normal")
 		self.tab_buttons[tab].config(state="disabled")
+
 		self.update_idletasks()
 
-		self.tabs[self.current_tab].grid_remove()
-		self.tabs[tab].grid()
-		self.tabs[tab].on_tab_open()
-		self.tabs[tab].update()
+		self.patch_listbox.grid_remove()
+		self.patch_list_bar.grid_remove()
+		if self.tabs[tab][1]:
+			self.patch_listbox.grid()
+			self.patch_list_bar.grid()
+
+		self.tabs[self.current_tab][0].grid_remove()
+		self.tabs[tab][0].grid()
+		self.tabs[tab][0].on_tab_open()
+		self.tabs[tab][0].update()
 		self.update_idletasks()
 
 		self.current_tab = tab
