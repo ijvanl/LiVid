@@ -1,14 +1,14 @@
 import numpy as np
 from record3d import Record3DStream
 import cv2
-from threading import Thread, Event
+from multiprocessing import Process, Event
 import logging
 
 TIME_DELAY_MS = 10
 
 FRAME_TIMEOUT = 0.5
 
-class BackendDevice(Thread):
+class BackendDevice(Process):
 	"""
 	Brings in data and sends it to postprocessor.
 	States:
