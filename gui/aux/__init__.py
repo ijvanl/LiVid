@@ -75,6 +75,7 @@ ROLE_SYMBOLS = {
 	"previous": "<",
 	"next": ">",
 	"run": "Run",
+	"preview": "Preview",
 	"play": "Play",
 	"pause": "Pause",
 	"stop": "Stop",
@@ -88,6 +89,7 @@ if sys.platform == "darwin":
 		"previous": u'\U00100189',
 		"next": u'\U0010018a',
 		"run": u'\U00100284',
+		"preview": u'\U00100283',
 		"play": u'\U00100284',
 		"pause": u'\U00100286',
 		"stop": u'\U001006f7',
@@ -99,6 +101,10 @@ class RoledButton(ttk.Button):
 	def __init__(self, *args, role="add", **kwargs):
 		#super().__init__(*args, text=ROLE_SYMBOLS[role], width=2, style="HelpButton", **kwargs)
 		super().__init__(*args, text=ROLE_SYMBOLS[role], width=2, **kwargs)
+
+	def __setattr__(self, name, value):
+		if name == "role": self["text"] = ROLE_SYMBOLS[value]
+		else: super().__setattr__(name, value)
 
 
 class CustomListbox(ttk.Frame):

@@ -9,6 +9,8 @@ from gui.patch_window import LiVidPatchWindowFrame
 from gui.editor_window import LiVidEditorWindowFrame
 from gui.mapping_window import LiVidMappingWindowFrame
 
+CONNECTION_CHECKUP_INTERVAL = 200
+PRESENTING_CHECKUP_INTERVAL = 100
 
 class LiVidMainWindow(tk.Toplevel):
 	def __init__(self, master, mc: LiVidModelController):
@@ -20,6 +22,13 @@ class LiVidMainWindow(tk.Toplevel):
 		style.map("Tab.TLabel",
 			font=[("disabled", ("System", 10, "bold"))],
 			foreground=[("disabled", "systemLabelColor")]
+		)
+
+		style.configure(
+			"Caption.TLabel",
+			font=("System", 8),
+			foreground="grey",
+			padding=-3
 		)
 
 		self.current_tab = "Editor"
@@ -48,8 +57,19 @@ class LiVidMainWindow(tk.Toplevel):
 		ttk.Separator(self.tab_bar).grid(column=0, row=1, columnspan=10, sticky=tk.E + tk.W)
 		self.tab_bar.columnconfigure(len(self.tab_buttons), weight=1)
 
-		self.play_button = aux.RoledButton(self.tab_bar, role="play", command=self.play)
-		self.play_button.grid(column=len(self.tab_buttons) + 1, row=0, padx=5)
+		conn_frame = ttk.Frame(self.tab_bar)
+		conn_frame.grid(column=len(self.tab_buttons) + 1, row=0, padx=5, pady=5)
+
+		self.midi_conn_text = ttk.Label(conn_frame, text="MIDI device disconnected", style="Caption.TLabel")
+		self.midi_conn_text.grid(column=0, row=0, sticky=tk.E)
+		self.device_conn_text = ttk.Label(conn_frame, text="Display device disconnected", style="Caption.TLabel")
+		self.device_conn_text.grid(column=0, row=1, sticky=tk.E)
+
+		self.preview_button = aux.RoledButton(self.tab_bar, role="preview", command=self.on_preview)
+		self.preview_button.grid(column=len(self.tab_buttons) + 2, row=0, padx=(0, 5))
+
+		self.play_button = aux.RoledButton(self.tab_bar, role="play", command=self.on_preview)
+		self.play_button.grid(column=len(self.tab_buttons) + 3, row=0, padx=(0, 5))
 
 		self.patch_listbox = aux.ScrollListbox(self)
 		self.patch_listbox.set_update_callback(self.on_patch_selected)
@@ -73,17 +93,41 @@ class LiVidMainWindow(tk.Toplevel):
 		self.columnconfigure(1, weight=1)
 		self.rowconfigure(1, weight=1)
 
-	def play(self):
+		self.switch_tabs("Editor")
+
+		self.connection_checkup()
+
+	def on_preview(self):
 		try:
-			self.mc.backend.start_displaying()
+			if not self.mc.backend.device.is_presenting()[0]:
+				self.mc.backend.start_displaying()
+				self.presenting_checkup()
+			else:
+				self.mc.backend.device.end_session()
 		except RuntimeError:
 			mbox.showwarning(
 				None, "No device connected!",
 				detail="Try connecting a compatible device, checking your connection, or adjusting your project settings."
 			)
 	
-	def backend_checkup(self):
-		self.mc.backend.device.is_presenting
+
+
+	def connection_checkup(self):
+		display_conn = self.mc.backend.device.device is not None
+		midi_conn = False
+		self.device_conn_text["text"] = "Display device connected" if display_conn else "No display device connected"
+		self.midi_conn_text["text"] = "MIDI device connected" if midi_conn else "No MIDI device connected"
+		self.preview_button["state"] = tk.NORMAL if display_conn else tk.DISABLED
+		self.play_button["state"] = tk.NORMAL if display_conn and midi_conn else tk.DISABLED
+		self.after(CONNECTION_CHECKUP_INTERVAL, self.connection_checkup)
+
+	def presenting_checkup(self):
+		(presenting, flag) = self.mc.backend.device.is_presenting()
+		if presenting:
+			self.preview_button.role = "stop"
+			self.after(PRESENTING_CHECKUP_INTERVAL, self.presenting_checkup)
+		else:
+			self.preview_button.role = "preview"
 
 	def on_patch_selected(self, event):
 		for tab in self.tabs.values():

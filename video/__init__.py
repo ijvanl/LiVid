@@ -51,5 +51,6 @@ class VideoRenderer:
 			cv2.imshow('Stream', image_bgr)
 			self.mc.tk.after(TIME_DELAY_MS, self.display_step) # reschedule only if image is not none
 		else:
+			print("image gone")
 			cv2.destroyAllWindows()
 			self.device.end_session() # will end only if it hasn't already. if it has, flags won't change.

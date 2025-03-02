@@ -25,11 +25,19 @@ class BackendDevice(Thread):
 		self.device = None
 		self.presenting_session = None
 		self.session_end_flag = None
+		self.session_requires_end = False
 	
 	def set_postprocess_function(self, fn):
 		self.postprocess_function = fn
 	
 	def start_session(self):
+		pass
+
+	def end_session(self, flag=None):
+		self.session_end_flag = flag
+		self.session_requires_end = True
+	
+	def end_session_from_thread(self):
 		pass
 
 	def scan_for_device(self):
@@ -52,7 +60,11 @@ class BackendDevice(Thread):
 			else:
 				self.scan_for_device()
 		elif self.presenting_session is not None:
-			self.process_data_frame()
+			if self.session_requires_end:
+				self.session_requires_end = False
+				self.end_session_from_thread()
+			else:
+				self.process_data_frame()
 		else:
 			self.standby()
 	
@@ -78,34 +90,36 @@ class LidarBackendDevice(BackendDevice):
 		self.logger = logger
 
 	def scan_for_device(self):
-		if self.device is None:
-			self.logger.info("scanning for devices")
-			devices = Record3DStream.get_connected_devices()
-			self.logger.info("{} device(s) found".format(len(devices)))
-			for dev in devices:
-				self.logger.info("\tID: {}\n\tUDID: {}\n".format(dev.product_id, dev.udid))
+		self.logger.info("scanning for devices")
+		devices = Record3DStream.get_connected_devices()
+		self.logger.info("{} device(s) found".format(len(devices)))
+		for dev in devices:
+			self.logger.info("\tID: {}\n\tUDID: {}\n".format(dev.product_id, dev.udid))
 
-			if len(devices) > self.use_device_id:
-				self.device = devices[self.use_device_id]
-			#else: raise RuntimeError("cannot connect to device #{}".format(self.use_device_id))
-		else:
-			raise RuntimeError("scanning for devices with device already extant")
+		if len(devices) > self.use_device_id:
+			self.device = devices[self.use_device_id]
+		#else: raise RuntimeError("cannot connect to device #{}".format(self.use_device_id))
 	
 	def start_session(self):
 		if self.device is not None and self.presenting_session is None:
+			self.logger.info("starting session")
+			#self.scan_for_device() # reset device
 			self.presenting_session = Record3DStream()
 			self.presenting_session.on_new_frame = self.process_data_frame
 			self.presenting_session.on_stream_stopped = self.on_stream_stopped
+			self.logger.info("connecting")
 			self.presenting_session.connect(self.device) # Initiate connection and start capturing
+			#self.session_end_flag = None
 
-	def end_session(self, flag=None):
+	def end_session_from_thread(self):
 		if self.device is not None and self.presenting_session is not None:
-			self.presenting_session.disconnect(self.device)
+			self.presenting_session.disconnect()
+			self.logger.info("disconnected")
 			del self.presenting_session
 			self.presenting_session = None
-			self.end_session_flag = flag
 
 	def on_stream_stopped(self):
+		self.logger.info("stream stopped")
 		self.end_session(flag="stopped")
 	
 	def is_presenting(self):
