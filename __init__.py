@@ -9,11 +9,12 @@ class LiVidApp:
 		self.backend = VideoRenderer()
 		self.mc = LiVidModelController(self.backend)
 
-		self.tk = tk.Tk()
-		self.tk.withdraw()
+		#self.tk = main_window.LiVidMainWindow(self.tk, self.mc)#tk.Tk()
+		self.tk = main_window.LiVidMainWindow(self.mc)
+		#self.tk.withdraw()
 
 		self.mc.tk = self.tk
 
-		self.gui = main_window.LiVidMainWindow(self.tk, self.mc)
+		#self.gui = 
 
 		self.tk.mainloop()

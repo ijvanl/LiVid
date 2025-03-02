@@ -142,7 +142,8 @@ class LidarBackendDevice(BackendDevice):
 	
 	# call from main thread — blocks until ready
 	def get_image(self):
-		success = self.display_ready_event.wait(timeout=FRAME_TIMEOUT)
+		#success = self.display_ready_event.wait(timeout=FRAME_TIMEOUT)
+		success = True
 		if success:
 			self.display_ready_event.clear()
 			return self.image

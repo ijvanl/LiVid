@@ -209,7 +209,7 @@ class CustomListbox(ttk.Frame):
 		if len(self.list_frame.grid_slaves()) == 0:
 			ttk.Frame(self.list_frame, width=10, height=10, relief="raised").grid(column=0, row=0)
 
-		self.update_idletasks()
+		self.update_idletasks() # necessary
 
 
 if __name__ == "__main__":

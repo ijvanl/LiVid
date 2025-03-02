@@ -13,9 +13,11 @@ from gui.mapping_window import LiVidMappingWindowFrame
 CONNECTION_CHECKUP_INTERVAL = 200
 PRESENTING_CHECKUP_INTERVAL = 100
 
-class LiVidMainWindow(tk.Toplevel):
-	def __init__(self, master, mc: LiVidModelController):
-		super().__init__(master)
+class LiVidMainWindow(tk.Tk):
+	def __init__(self, mc: LiVidModelController):
+	#def __init__(self, master, mc: LiVidModelController):
+		#super().__init__(master)
+		super().__init__()
 		self.mc = mc
 
 		style = ttk.Style()
@@ -180,8 +182,6 @@ class LiVidMainWindow(tk.Toplevel):
 	def switch_tabs(self, tab):
 		for button in self.tab_buttons.values(): button.config(state="normal")
 		self.tab_buttons[tab].config(state="disabled")
-
-		self.update_idletasks()
 
 		self.patch_listbox.grid_remove()
 		self.patch_list_bar.grid_remove()

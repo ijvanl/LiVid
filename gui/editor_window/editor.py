@@ -37,6 +37,7 @@ class PatchTextEditor(ttk.Frame):
 		tab = font.measure('    ')
 
 		self.text.config(tabs=tab, undo=True)
+		self.text.config(tabs=tab)
 
 		self.text.bind("<<Modified>>", self.on_modified)
 		self.text.bind("<Return>", self.auto_indent)
