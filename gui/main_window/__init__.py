@@ -23,7 +23,6 @@ class LiVidMainWindow(tk.Toplevel):
 			font=[("disabled", ("System", 10, "bold"))],
 			foreground=[("disabled", "systemLabelColor")]
 		)
-
 		style.configure(
 			"Caption.TLabel",
 			font=("System", 8),
@@ -108,9 +107,7 @@ class LiVidMainWindow(tk.Toplevel):
 			mbox.showwarning(
 				None, "No device connected!",
 				detail="Try connecting a compatible device, checking your connection, or adjusting your project settings."
-			)
-	
-
+			)	
 
 	def connection_checkup(self):
 		display_conn = self.mc.backend.device.device is not None
@@ -142,6 +139,7 @@ class LiVidMainWindow(tk.Toplevel):
 	def add_patch(self):
 		print("add patch")
 		patch_name = f"Patch #{len(self.mc.patches)}"
+		self.prebuild_patch_listbox(patch_name, patch_name)
 		self.mc.add_patch(patch_name)
 		self.update_patch_listbox(patch_name)
 
@@ -151,6 +149,13 @@ class LiVidMainWindow(tk.Toplevel):
 			self.mc.remove_patch(self.mc.current_patch_name)
 			self.mc.current_patch_name = None
 			self.update_patch_listbox(())
+
+	def prebuild_patch_listbox(self, new_name, new_index=None):
+		"""Add new name to patch listbox before (costly) patch creation."""
+		if new_index == None:
+			new_index = self.mc.current_patch_name if self.mc.current_patch_name is not None else self.patch_listbox.listbox.selection()
+		self.patch_listbox.insert("end", new_name, text=new_name)
+		self.patch_listbox.listbox.selection_set(new_index)
 
 	def update_patch_listbox(self, new_index=None):
 		if new_index == None:
@@ -171,17 +176,17 @@ class LiVidMainWindow(tk.Toplevel):
 		self.tab_buttons[name].grid(column=len(self.tab_buttons) - 1, row=0, padx=(5, 0), pady=5)
 	
 	def switch_tabs(self, tab):
+		for button in self.tab_buttons.values(): button.config(state="normal")
+		self.tab_buttons[tab].config(state="disabled")
+		self.update_idletasks()
+
 		self.tabs[self.current_tab].grid_remove()
 		self.tabs[tab].grid()
 		self.tabs[tab].on_tab_open()
 		self.tabs[tab].update()
-		
-		for button in self.tab_buttons.values(): button.config(state="normal")
-		
-		self.tab_buttons[tab].config(state="disabled")
-		
-		self.current_tab = tab
 		self.update_idletasks()
+
+		self.current_tab = tab
 
 
 if __name__ == "__main__":
